@@ -7,7 +7,7 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+        .container { max-width: 1100px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
         header { background: #2c3e50; color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
         h1 { font-size: 1.5rem; }
         .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -15,10 +15,12 @@
         .controls button { padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; }
         .controls button:hover { background: #2980b9; }
         .controls button:disabled { background: #95a5a6; cursor: not-allowed; }
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; padding: 20px; background: #ecf0f1; }
-        .stat-card { background: white; padding: 15px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .stat-label { font-size: 0.85rem; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.5px; }
-        .stat-value { font-size: 1.5rem; font-weight: 600; color: #2c3e50; margin-top: 5px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; padding: 20px; background: #ecf0f1; }
+        .stat-card { background: white; padding: 14px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .stat-label { font-size: 0.75rem; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 1.3rem; font-weight: 600; color: #2c3e50; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .stat-section { background: #f8f9fa; border-top: 1px solid #eee; }
+        .stat-section h3 { padding: 12px 20px; margin: 0; font-size: 0.9rem; color: #2c3e50; border-bottom: 1px solid #eee; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
         th { background: #f8f9fa; font-weight: 600; color: #2c3e50; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -41,7 +43,7 @@
             </div>
         </header>
 
-        <div class="stats" id="stats">
+        <div class="stats" id="statsOverall">
             <div class="stat-card">
                 <div class="stat-label">Total Cycles</div>
                 <div class="stat-value" id="totalCycles">-</div>
@@ -51,9 +53,64 @@
                 <div class="stat-value" id="totalRunningTime">-</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Average Running Time</div>
+                <div class="stat-label">Avg Running Time</div>
                 <div class="stat-value" id="avgRunningTime">-</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-label">Max Running Time</div>
+                <div class="stat-value" id="maxRunningTime">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Min Running Time</div>
+                <div class="stat-value" id="minRunningTime">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Cycles/Day</div>
+                <div class="stat-value" id="avgCyclesPerDay">-</div>
+            </div>
+        </div>
+
+        <div class="stats stat-section" id="statsToday">
+            <h3>Today</h3>
+            <div class="stat-card">
+                <div class="stat-label">Cycles</div>
+                <div class="stat-value" id="cyclesToday">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Max Running</div>
+                <div class="stat-value" id="maxRunningToday">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Min Running</div>
+                <div class="stat-value" id="minRunningToday">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Running</div>
+                <div class="stat-value" id="avgRunningToday">-</div>
+            </div>
+        </div>
+
+        <div class="stats stat-section" id="statsYesterday">
+            <h3>Yesterday</h3>
+            <div class="stat-card">
+                <div class="stat-label">Cycles</div>
+                <div class="stat-value" id="cyclesYesterday">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Max Running</div>
+                <div class="stat-value" id="maxRunningYesterday">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Min Running</div>
+                <div class="stat-value" id="minRunningYesterday">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Running</div>
+                <div class="stat-value" id="avgRunningYesterday">-</div>
+            </div>
+        </div>
+
+        <div class="stats" style="padding: 20px;">
             <div class="stat-card">
                 <div class="stat-label">Last Event</div>
                 <div class="stat-value" id="lastEvent">-</div>
@@ -121,7 +178,8 @@
         }
 
         function formatDuration(ms) {
-            if (ms < 0) return 'N/A';
+            if (ms < 0 || ms === null || ms === undefined) return 'N/A';
+            if (isNaN(ms)) return 'N/A';
             const seconds = Math.floor(ms / 1000);
             const minutes = Math.floor(seconds / 60);
             const hours = Math.floor(minutes / 60);
@@ -137,8 +195,34 @@
             const date = new Date(isoString);
             return date.toLocaleString(undefined, {
                 year: 'numeric', month: 'short', day: 'numeric',
-                hour: '2-digit', minute: '2-digit', second: '2-digit'
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false
             });
+        }
+
+        function getDayBounds(date) {
+            const start = new Date(date);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(date);
+            end.setHours(23, 59, 59, 999);
+            return { start, end };
+        }
+
+        function isToday(ts) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const eventDate = new Date(ts);
+            eventDate.setHours(0, 0, 0, 0);
+            return eventDate.getTime() === today.getTime();
+        }
+
+        function isYesterday(ts) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            yesterday.setHours(0, 0, 0, 0);
+            const eventDate = new Date(ts);
+            eventDate.setHours(0, 0, 0, 0);
+            return eventDate.getTime() === yesterday.getTime();
         }
 
         function renderEvents(events) {
@@ -148,32 +232,96 @@
                 return;
             }
 
-            // Calculate stats
+            // Overall stats
             let totalCycles = 0;
             let totalRunningMs = 0;
+            let maxRunningMs = 0;
+            let minRunningMs = Infinity;
             let lastStart = null;
+            const allDurations = [];
+
+            // Per-day stats
+            const today = { cycles: 0, durations: [], maxMs: 0, minMs: Infinity };
+            const yesterday = { cycles: 0, durations: [], maxMs: 0, minMs: Infinity };
+            const cyclesByDay = {};
 
             // Events are ordered desc (newest first), reverse for calculation
             const sorted = [...events].reverse();
 
             for (const ev of sorted) {
+                const ts = new Date(ev.ts).getTime();
+                const dayKey = new Date(ts).toISOString().split('T')[0];
+                
+                if (!cyclesByDay[dayKey]) cyclesByDay[dayKey] = 0;
+                if (ev.event === 'start') cyclesByDay[dayKey]++;
+
                 if (ev.event === 'start') {
-                    lastStart = new Date(ev.ts).getTime();
+                    lastStart = ts;
                 } else if (ev.event === 'stop' && lastStart !== null) {
-                    const duration = new Date(ev.ts).getTime() - lastStart;
+                    const duration = ts - lastStart;
                     if (duration > 0) {
                         totalCycles++;
                         totalRunningMs += duration;
+                        maxRunningMs = Math.max(maxRunningMs, duration);
+                        minRunningMs = Math.min(minRunningMs, duration);
+                        allDurations.push(duration);
+
+                        // Check if today or yesterday
+                        if (isToday(ev.ts)) {
+                            today.cycles++;
+                            today.durations.push(duration);
+                            today.maxMs = Math.max(today.maxMs, duration);
+                            today.minMs = Math.min(today.minMs, duration);
+                        } else if (isYesterday(ev.ts)) {
+                            yesterday.cycles++;
+                            yesterday.durations.push(duration);
+                            yesterday.maxMs = Math.max(yesterday.maxMs, duration);
+                            yesterday.minMs = Math.min(yesterday.minMs, duration);
+                        }
                     }
                     lastStart = null;
                 }
             }
 
             const avgRunningMs = totalCycles > 0 ? totalRunningMs / totalCycles : 0;
+            
+            // Average cycles per day
+            const daysWithCycles = Object.keys(cyclesByDay).length;
+            const avgCyclesPerDay = daysWithCycles > 0 ? totalCycles / daysWithCycles : 0;
 
+            // Today stats
+            const todayAvgMs = today.durations.length > 0 
+                ? today.durations.reduce((a, b) => a + b, 0) / today.durations.length 
+                : 0;
+            const todayMinMs = today.minMs === Infinity ? 0 : today.minMs;
+
+            // Yesterday stats
+            const yesterdayAvgMs = yesterday.durations.length > 0 
+                ? yesterday.durations.reduce((a, b) => a + b, 0) / yesterday.durations.length 
+                : 0;
+            const yesterdayMinMs = yesterday.minMs === Infinity ? 0 : yesterday.minMs;
+
+            // Update overall stats
             document.getElementById('totalCycles').textContent = totalCycles;
             document.getElementById('totalRunningTime').textContent = formatDuration(totalRunningMs);
             document.getElementById('avgRunningTime').textContent = formatDuration(avgRunningMs);
+            document.getElementById('maxRunningTime').textContent = formatDuration(maxRunningMs);
+            document.getElementById('minRunningTime').textContent = formatDuration(minRunningMs === Infinity ? 0 : minRunningMs);
+            document.getElementById('avgCyclesPerDay').textContent = avgCyclesPerDay.toFixed(1);
+
+            // Today stats
+            document.getElementById('cyclesToday').textContent = today.cycles;
+            document.getElementById('maxRunningToday').textContent = formatDuration(today.maxMs);
+            document.getElementById('minRunningToday').textContent = formatDuration(todayMinMs);
+            document.getElementById('avgRunningToday').textContent = formatDuration(todayAvgMs);
+
+            // Yesterday stats
+            document.getElementById('cyclesYesterday').textContent = yesterday.cycles;
+            document.getElementById('maxRunningYesterday').textContent = formatDuration(yesterday.maxMs);
+            document.getElementById('minRunningYesterday').textContent = formatDuration(yesterdayMinMs);
+            document.getElementById('avgRunningYesterday').textContent = formatDuration(yesterdayAvgMs);
+
+            // Last event
             document.getElementById('lastEvent').textContent = formatDateTime(events[0].ts);
 
             // Render table
@@ -206,8 +354,15 @@
         }
 
         function clearStats() {
-            ['totalCycles', 'totalRunningTime', 'avgRunningTime', 'lastEvent'].forEach(id => {
-                document.getElementById(id).textContent = '-';
+            const ids = [
+                'totalCycles', 'totalRunningTime', 'avgRunningTime', 'maxRunningTime', 'minRunningTime', 'avgCyclesPerDay',
+                'cyclesToday', 'maxRunningToday', 'minRunningToday', 'avgRunningToday',
+                'cyclesYesterday', 'maxRunningYesterday', 'minRunningYesterday', 'avgRunningYesterday',
+                'lastEvent'
+            ];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = '-';
             });
         }
 
