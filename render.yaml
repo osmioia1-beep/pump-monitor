@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: pump-monitor
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: yes
+    autoDeploy: true
+    branch: main
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
