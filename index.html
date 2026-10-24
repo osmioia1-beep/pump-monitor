@@ -34,6 +34,14 @@
         .last-event-row { padding: 15px 20px; background: #f8f9fa; border-top: 1px solid #eee; }
         .last-event-row .stat-label { font-size: 0.75rem; }
         .last-event-row .stat-value { font-size: 1rem; }
+        [hidden] { display: none !important; }
+        .context { padding: 16px 20px; color: #52616d; font-size: .85rem; line-height: 1.5; }
+        .context p + p { margin-top: 8px; }
+        #quality { color: #9a5700; font-weight: 600; }
+        .stat-section h3, .horizon-coverage { grid-column: 1 / -1; }
+        .horizon-coverage { color: #52616d; font-size: .8rem; }
+        .table-scroll { overflow-x: auto; }
+        .stat-value { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
     </style>
 </head>
 <body>
@@ -41,20 +49,29 @@
         <header>
             <h1>🚰 Pump Monitor</h1>
             <div class="controls">
-                <input type="number" id="limitInput" value="50" min="1" max="500" placeholder="Records">
+                <label for="limitInput">Table rows</label>
+                <input type="number" id="limitInput" value="50" min="1" max="500" step="1">
                 <button id="refreshBtn">Refresh</button>
             </div>
         </header>
 
+        <div class="context">
+            <p id="coverage" role="status" aria-live="polite"></p>
+            <p id="pumpState"></p>
+            <p id="quality" role="status"></p>
+            <p>Completed cycles are assigned to the day they end. Running time is split across days and includes the open cycle up to the snapshot. Average, maximum and minimum durations use completed cycles only. Daily rates use the full calendar window; incomplete days show N/A. Global cycles/day includes every observed calendar date, including idle and partial dates.</p>
+        </div>
+
         <!-- GLOBAL SECTION -->
         <div class="stats stat-section" id="statsGlobal">
             <h3>Global</h3>
+            <p class="horizon-coverage" id="globalCoverage"></p>
             <div class="stat-card">
-                <div class="stat-label">Cycles</div>
+                <div class="stat-label">Completed Cycles</div>
                 <div class="stat-value" id="cyclesGlobal">-</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Running Time</div>
+                <div class="stat-label">Running Time in Period</div>
                 <div class="stat-value" id="runningTimeGlobal">-</div>
             </div>
             <div class="stat-card">
@@ -82,12 +99,13 @@
         <!-- TODAY SECTION -->
         <div class="stats stat-section" id="statsToday">
             <h3>Today</h3>
+            <p class="horizon-coverage" id="todayCoverage"></p>
             <div class="stat-card">
-                <div class="stat-label">Cycles</div>
+                <div class="stat-label">Completed Cycles</div>
                 <div class="stat-value" id="cyclesToday">-</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Running Time</div>
+                <div class="stat-label">Running Time in Period</div>
                 <div class="stat-value" id="runningTimeToday">-</div>
             </div>
             <div class="stat-card">
@@ -111,12 +129,13 @@
         <!-- YESTERDAY SECTION -->
         <div class="stats stat-section" id="statsYesterday">
             <h3>Yesterday</h3>
+            <p class="horizon-coverage" id="yesterdayCoverage"></p>
             <div class="stat-card">
-                <div class="stat-label">Cycles</div>
+                <div class="stat-label">Completed Cycles</div>
                 <div class="stat-value" id="cyclesYesterday">-</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Running Time</div>
+                <div class="stat-label">Running Time in Period</div>
                 <div class="stat-value" id="runningTimeYesterday">-</div>
             </div>
             <div class="stat-card">
@@ -143,296 +162,28 @@
             <div class="stat-value" id="lastEvent">-</div>
         </div>
 
-        <div id="error" class="error" style="display:none;"></div>
-        <div id="loading" class="loading" style="display:none;">Loading...</div>
+        <div id="error" class="error" role="alert" hidden></div>
+        <div id="loading" class="loading" role="status" hidden>Loading history…</div>
 
-        <table id="eventsTable" style="display:none;">
+        <div class="table-scroll">
+        <table id="eventsTable" hidden>
             <thead>
                 <tr>
                     <th>Event</th>
-                    <th>Timestamp (Local)</th>
+                    <th>Timestamp (Europe/Lisbon)</th>
                     <th>Duration</th>
                     <th>Source IP</th>
                 </tr>
             </thead>
             <tbody id="eventsBody"></tbody>
         </table>
+        </div>
 
-        <div id="emptyMsg" class="empty" style="display:none;">No events found</div>
+        <div id="emptyMsg" class="empty" hidden>No events found</div>
     </div>
 
-    <script>
-        const SUPABASE_URL = 'https://lfatskduuzwdqoomtphh.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_glIqqTFNY8hDXl_3qaEOFQ_BWX8QU8T';
-
-        const refreshBtn = document.getElementById('refreshBtn');
-        const limitInput = document.getElementById('limitInput');
-        const loading = document.getElementById('loading');
-        const errorDiv = document.getElementById('error');
-        const eventsTable = document.getElementById('eventsTable');
-        const eventsBody = document.getElementById('eventsBody');
-        const emptyMsg = document.getElementById('emptyMsg');
-
-        async function fetchEvents() {
-            const limit = parseInt(limitInput.value) || 50;
-            loading.style.display = 'block';
-            errorDiv.style.display = 'none';
-            eventsTable.style.display = 'none';
-            emptyMsg.style.display = 'none';
-            refreshBtn.disabled = true;
-
-            try {
-                const url = `${SUPABASE_URL}/rest/v1/pump_events?select=*&order=ts.desc&limit=${limit}`;
-                const response = await fetch(url, {
-                    headers: {
-                        'apikey': SUPABASE_ANON_KEY,
-                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-                    }
-                });
-
-                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-
-                const events = await response.json();
-                renderEvents(events);
-            } catch (err) {
-                errorDiv.textContent = 'Error loading events: ' + err.message;
-                errorDiv.style.display = 'block';
-            } finally {
-                loading.style.display = 'none';
-                refreshBtn.disabled = false;
-            }
-        }
-
-        function formatDuration(ms) {
-            if (ms < 0 || ms === null || ms === undefined) return 'N/A';
-            if (isNaN(ms)) return 'N/A';
-            const seconds = Math.floor(ms / 1000);
-            const minutes = Math.floor(seconds / 60);
-            const hours = Math.floor(minutes / 60);
-            const days = Math.floor(hours / 24);
-
-            if (days > 0) return `${days}d ${hours % 24}h ${minutes % 60}m`;
-            if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-            if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-            return `${seconds}s`;
-        }
-
-        function formatDateTime(isoString) {
-            const date = new Date(isoString);
-            return date.toLocaleString(undefined, {
-                year: 'numeric', month: 'short', day: 'numeric',
-                hour: '2-digit', minute: '2-digit', second: '2-digit',
-                hour12: false
-            });
-        }
-
-        function isToday(ts) {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const eventDate = new Date(ts);
-            eventDate.setHours(0, 0, 0, 0);
-            return eventDate.getTime() === today.getTime();
-        }
-
-        function isYesterday(ts) {
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            yesterday.setHours(0, 0, 0, 0);
-            const eventDate = new Date(ts);
-            eventDate.setHours(0, 0, 0, 0);
-            return eventDate.getTime() === yesterday.getTime();
-        }
-
-        function getHoursInSpan(startTs, endTs) {
-            const hours = (endTs - startTs) / (1000 * 60 * 60);
-            return Math.max(hours, 0.001); // Avoid division by zero
-        }
-
-        function renderEvents(events) {
-            if (!events.length) {
-                emptyMsg.style.display = 'block';
-                clearStats();
-                return;
-            }
-
-            // Data structures for each horizon
-            const global = { cycles: 0, durations: [], maxMs: 0, minMs: Infinity, firstTs: null, lastTs: null };
-            const today = { cycles: 0, durations: [], maxMs: 0, minMs: Infinity, firstTs: null, lastTs: null };
-            const yesterday = { cycles: 0, durations: [], maxMs: 0, minMs: Infinity, firstTs: null, lastTs: null };
-            const cyclesByDay = {};
-
-            let lastStart = null;
-
-            // Events are ordered desc (newest first), reverse for calculation
-            const sorted = [...events].reverse();
-
-            for (const ev of sorted) {
-                const ts = new Date(ev.ts).getTime();
-                const dayKey = new Date(ts).toISOString().split('T')[0];
-
-                if (!cyclesByDay[dayKey]) cyclesByDay[dayKey] = 0;
-                if (ev.event === 'start') cyclesByDay[dayKey]++;
-
-                // Track global time span
-                if (global.firstTs === null || ts < global.firstTs) global.firstTs = ts;
-                if (global.lastTs === null || ts > global.lastTs) global.lastTs = ts;
-
-                if (ev.event === 'start') {
-                    lastStart = ts;
-                } else if (ev.event === 'stop' && lastStart !== null) {
-                    const duration = ts - lastStart;
-                    if (duration > 0) {
-                        // Global
-                        global.cycles++;
-                        global.durations.push(duration);
-                        global.maxMs = Math.max(global.maxMs, duration);
-                        global.minMs = Math.min(global.minMs, duration);
-
-                        // Track global time span for cycles/hour
-                        if (global.firstTs === null || lastStart < global.firstTs) global.firstTs = lastStart;
-                        if (global.lastTs === null || ts > global.lastTs) global.lastTs = ts;
-
-                        // Today
-                        if (isToday(ev.ts)) {
-                            today.cycles++;
-                            today.durations.push(duration);
-                            today.maxMs = Math.max(today.maxMs, duration);
-                            today.minMs = Math.min(today.minMs, duration);
-                            if (today.firstTs === null || lastStart < today.firstTs) today.firstTs = lastStart;
-                            if (today.lastTs === null || ts > today.lastTs) today.lastTs = ts;
-                        } 
-                        // Yesterday
-                        else if (isYesterday(ev.ts)) {
-                            yesterday.cycles++;
-                            yesterday.durations.push(duration);
-                            yesterday.maxMs = Math.max(yesterday.maxMs, duration);
-                            yesterday.minMs = Math.min(yesterday.minMs, duration);
-                            if (yesterday.firstTs === null || lastStart < yesterday.firstTs) yesterday.firstTs = lastStart;
-                            if (yesterday.lastTs === null || ts > yesterday.lastTs) yesterday.lastTs = ts;
-                        }
-                    }
-                    lastStart = null;
-                }
-            }
-
-            // Helper to compute stats for a horizon
-            function computeStats(horizon) {
-                if (horizon.cycles === 0) {
-                    return {
-                        cycles: 0,
-                        runningTime: 'N/A',
-                        avgRunning: 'N/A',
-                        maxRunning: 'N/A',
-                        minRunning: 'N/A',
-                        avgCyclesPerHour: 'N/A'
-                    };
-                }
-                const totalMs = horizon.durations.reduce((a, b) => a + b, 0);
-                const avgMs = totalMs / horizon.cycles;
-                const minMs = horizon.minMs === Infinity ? 0 : horizon.minMs;
-                
-                // Calculate avg cycles per hour
-                let avgCyclesPerHour = 'N/A';
-                if (horizon.firstTs && horizon.lastTs) {
-                    const hours = getHoursInSpan(horizon.firstTs, horizon.lastTs);
-                    if (hours > 0) {
-                        avgCyclesPerHour = (horizon.cycles / hours).toFixed(2);
-                    }
-                }
-
-                return {
-                    cycles: horizon.cycles,
-                    runningTime: formatDuration(totalMs),
-                    avgRunning: formatDuration(avgMs),
-                    maxRunning: formatDuration(horizon.maxMs),
-                    minRunning: formatDuration(minMs),
-                    avgCyclesPerHour: avgCyclesPerHour
-                };
-            }
-
-            const globalStats = computeStats(global);
-            const todayStats = computeStats(today);
-            const yesterdayStats = computeStats(yesterday);
-
-            // Global stats (7 stats: cycles, running time, avg running, max, min, avg cycles/hour, avg cycles/day)
-            document.getElementById('cyclesGlobal').textContent = globalStats.cycles;
-            document.getElementById('runningTimeGlobal').textContent = globalStats.runningTime;
-            document.getElementById('avgRunningGlobal').textContent = globalStats.avgRunning;
-            document.getElementById('maxRunningGlobal').textContent = globalStats.maxRunning;
-            document.getElementById('minRunningGlobal').textContent = globalStats.minRunning;
-            document.getElementById('avgCyclesPerHourGlobal').textContent = globalStats.avgCyclesPerHour;
-            
-            // Avg cycles per day (global only)
-            const daysWithCycles = Object.keys(cyclesByDay).length;
-            const avgCyclesPerDay = daysWithCycles > 0 ? (global.cycles / daysWithCycles).toFixed(1) : 'N/A';
-            document.getElementById('avgCyclesPerDayGlobal').textContent = avgCyclesPerDay;
-
-            // Today stats
-            document.getElementById('cyclesToday').textContent = todayStats.cycles;
-            document.getElementById('runningTimeToday').textContent = todayStats.runningTime;
-            document.getElementById('avgRunningToday').textContent = todayStats.avgRunning;
-            document.getElementById('maxRunningToday').textContent = todayStats.maxRunning;
-            document.getElementById('minRunningToday').textContent = todayStats.minRunning;
-            document.getElementById('avgCyclesPerHourToday').textContent = todayStats.avgCyclesPerHour;
-
-            // Yesterday stats
-            document.getElementById('cyclesYesterday').textContent = yesterdayStats.cycles;
-            document.getElementById('runningTimeYesterday').textContent = yesterdayStats.runningTime;
-            document.getElementById('avgRunningYesterday').textContent = yesterdayStats.avgRunning;
-            document.getElementById('maxRunningYesterday').textContent = yesterdayStats.maxRunning;
-            document.getElementById('minRunningYesterday').textContent = yesterdayStats.minRunning;
-            document.getElementById('avgCyclesPerHourYesterday').textContent = yesterdayStats.avgCyclesPerHour;
-
-            // Last event
-            document.getElementById('lastEvent').textContent = formatDateTime(events[0].ts);
-
-            // Render table
-            eventsBody.innerHTML = events.map(ev => {
-                const rowClass = ev.event === 'start' ? 'event-start' : 'event-stop';
-                return `<tr>
-                    <td class="${rowClass}">${ev.event.toUpperCase()}</td>
-                    <td>${formatDateTime(ev.ts)}</td>
-                    <td class="duration">-</td>
-                    <td>${ev.source_ip || 'unknown'}</td>
-                </tr>`;
-            }).join('');
-
-            // Add duration column for stop events (pair with previous start)
-            const rows = eventsBody.querySelectorAll('tr');
-            let lastStartTime = null;
-            for (let i = rows.length - 1; i >= 0; i--) {
-                const row = rows[i];
-                const event = row.querySelector('td').textContent.toLowerCase();
-                if (event === 'stop' && lastStartTime) {
-                    const stopTime = new Date(events[i].ts).getTime();
-                    const duration = stopTime - lastStartTime;
-                    row.querySelector('.duration').textContent = formatDuration(duration);
-                } else if (event === 'start') {
-                    lastStartTime = new Date(events[i].ts).getTime();
-                }
-            }
-
-            eventsTable.style.display = 'table';
-        }
-
-        function clearStats() {
-            const ids = [
-                'cyclesGlobal', 'runningTimeGlobal', 'avgRunningGlobal', 'maxRunningGlobal', 'minRunningGlobal', 'avgCyclesPerHourGlobal', 'avgCyclesPerDayGlobal',
-                'cyclesToday', 'runningTimeToday', 'avgRunningToday', 'maxRunningToday', 'minRunningToday', 'avgCyclesPerHourToday',
-                'cyclesYesterday', 'runningTimeYesterday', 'avgRunningYesterday', 'maxRunningYesterday', 'minRunningYesterday', 'avgCyclesPerHourYesterday',
-                'lastEvent'
-            ];
-            ids.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.textContent = '-';
-            });
-        }
-
-        refreshBtn.addEventListener('click', fetchEvents);
-        limitInput.addEventListener('change', fetchEvents);
-
-        // Initial load
-        fetchEvents();
-    </script>
+    <script src="metrics.js" defer></script>
+    <script src="data.js" defer></script>
+    <script src="app.js" defer></script>
 </body>
 </html>
