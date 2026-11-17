@@ -26,7 +26,7 @@ Requests exclude later timestamps; changing row counts during pagination aborts 
 
 The optional `pump-watch` Supabase Edge Function adds a scheduled check for long runs and short cycling. The existing frequent-start alert is independent. Start with a 25-minute long-run threshold and three consecutive runs under 60 seconds within 15 minutes. Adjust with `PUMP_LONG_RUN_SECONDS`, `PUMP_SHORT_COUNT`, `PUMP_SHORT_RUN_SECONDS` and `PUMP_SHORT_WINDOW_SECONDS`. Telegram delivery is recorded after acknowledgement. A 15-minute cooldown applies to short-cycling alerts.
 
-1. Run [the database setup](supabase/setup-pump-watch.sql) in Supabase. Configure `pump_watch_telegram_token`, `pump_watch_telegram_chat`, `pump_watch_cron_secret` and `pump_watch_heartbeat_secret` in Supabase Vault. Use independent random values for the two request secrets.
+1. Run [the database setup](supabase/setup-pump-watch.sql) in Supabase. Configure `pump_watch_telegram_token`, `pump_watch_telegram_chat` and `pump_watch_cron_secret` in Supabase Vault. Generate a random value for the request secret.
 2. With the Supabase CLI linked to the intended project, deploy `supabase functions deploy pump-watch` from the repository root. The check endpoint validates its request secret.
 3. Store the cron secret in Vault as `pump_watch_cron_secret`, enable pg_cron and pg_net, and run [the schedule setup](supabase/schedule-pump-watch.sql). It posts to `/functions/v1/pump-watch/check` every minute with its `x-pump-key` header sourced from Vault. Check the function invocation logs to confirm it returns HTTP 204. The [Supabase scheduling guide](https://supabase.com/docs/guides/functions/schedule-functions) shows how to send Vault secrets as headers.
 
