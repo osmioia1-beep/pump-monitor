@@ -51,7 +51,7 @@ test('actual page scripts render shared metrics and safe event text across all l
     assert.equal(state.calls,3);assert.equal(e.cyclesGlobal.textContent,'2');
     assert.equal(e.runningTimeToday.textContent,'10m 0s');assert.equal(e.runningTimeYesterday.textContent,'10m 0s');
     assert.equal(e.avgRunningToday.textContent,'20m 0s');
-    assert.equal(e.averageChart.children.length,7);
+    assert.equal(e.averageChart.children.length,5);
     assert.equal(e.averageChart.children.at(-1).children[0].textContent,'20:00');
     assert.equal(e.eventsBody.children.length,5);
     const latest=e.eventsBody.children[0];
@@ -96,5 +96,20 @@ test('selecting a chart day filters the cycle view using the Lisbon stop date',a
     assert.equal(e.cyclesBody.children.length,2);
     e.chartRange.value='30';e.chartRange.handlers.change();
     assert.equal(e.activityChart.children.length,30);
+    assert.equal(state.calls,calls);
+});
+test('average graph independently covers all history, 7 days, 30 days and one year',async()=>{
+    const {elements:e,state}=await setup();
+    const calls=state.calls;
+    for(const count of [7,30,365]){
+        e.averageRange.value=String(count);e.averageRange.handlers.change();
+        assert.equal(e.averageChart.children.length,count);
+        assert.equal(e.activityChart.children.length,7);
+        assert.equal(e.averageChart.children.at(-1).children[0].textContent,'20:00');
+    }
+    e.averageRange.value='all';e.averageRange.handlers.change();
+    assert.equal(e.averageChart.children.length,5);
+    e.averageChart.children[0].handlers.click();
+    assert.match(e.historyDay.textContent,/2026-10-20/);
     assert.equal(state.calls,calls);
 });

@@ -130,7 +130,13 @@
             </div>
             <p class="chart-scale" id="activityScale"></p>
             <div class="chart-scroll"><div class="chart" id="activityChart"></div></div>
-            <h2 class="average-heading">Average time per cycle</h2>
+            <div class="panel-header average-heading">
+                <h2>Average time per cycle</h2>
+                <label>Average period <select id="averageRange">
+                    <option value="7">7 days</option><option value="30">30 days</option>
+                    <option value="365">1 year</option><option value="all" selected>All history</option>
+                </select></label>
+            </div>
             <p class="chart-scale" id="averageScale"></p>
             <div class="chart-scroll"><div class="chart" id="averageChart"></div></div>
             <p class="chart-scale">Completed cycles by their stop date, in Lisbon time. Tap a day for details and history. A dash means no completed cycles or no observation coverage.</p>
@@ -273,6 +279,6 @@
 
     <script src="metrics.js?v=20261117-mobile-2" defer></script>
     <script src="data.js?v=20261117-mobile-2" defer></script>
-    <script src="dashboard.js?v=20261117-mobile-2" defer></script>
+    <script src="dashboard.js?v=20261117-history-3" defer></script>
 </body>
 </html>

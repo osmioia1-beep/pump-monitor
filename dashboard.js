@@ -11,7 +11,7 @@ const formatDate = ms => Number.isFinite(ms) ? dateFormatter.format(ms) : 'Inval
 let snapshot = null;
 let selectedDay = null;
 let refreshing = false;
-let renderedRange = null;
+const renderedRanges = {};
 const REFRESH_INTERVAL = 60_000;
 function tableLimit() {
     const n = Number($('limitInput').value);
@@ -97,7 +97,12 @@ function renderTable(model) {
     $('emptyMsg').hidden = !!rows.length;
 }
 function renderActivity(model) {
-    const days = M.dailyActivity(model, $('chartRange').value === '30' ? 30 : 7);
+    const activityDays = M.dailyActivity(model, $('chartRange').value === '30' ? 30 : 7);
+    const historyDays = model.firstTs === null ? 1 :
+        Math.round((Date.parse(M.dayKey(model.now)) - Date.parse(M.dayKey(model.firstTs))) / 86400000) + 1;
+    const averageRange = $('averageRange').value;
+    const averageCount = ['7', '30', '365'].includes(averageRange) ? Number(averageRange) : historyDays;
+    const averageDays = M.dailyActivity(model, averageCount);
     const runtime = $('activityMetric').value === 'runtime';
     const compactDuration = ms => {
         if (!Number.isFinite(ms)) return '—';
@@ -105,14 +110,15 @@ function renderActivity(model) {
         if (seconds >= 3600) return `${Math.floor(seconds / 3600)}h ${Math.floor(seconds % 3600 / 60)}m`;
         return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
     };
-    const maxActivity = Math.max(1, ...days.map(day => runtime ? day.runningMs : day.cycles));
-    const maxAverage = Math.max(1, ...days.map(day => day.avgMs ?? 0));
+    const maxActivity = Math.max(1, ...activityDays.map(day => runtime ? day.runningMs : day.cycles));
+    const maxAverage = Math.max(1, ...averageDays.map(day => day.avgMs ?? 0));
     const focusedDay = document.activeElement?.dataset?.day;
-    if (!days.some(day => day.key === selectedDay)) selectedDay = null;
+    if (![...activityDays, ...averageDays].some(day => day.key === selectedDay)) selectedDay = null;
     const dayLabel = day => day.available
         ? `${day.key} · ${day.cycles} completed cycles · ${M.formatDuration(day.runningMs)} running · Average ${M.formatDuration(day.avgMs)}${day.partial ? ' · Partial history' : ''}`
         : `${day.key} · No observation coverage`;
     for (const [chartId, average] of [['activityChart', false], ['averageChart', true]]) {
+        const days = average ? averageDays : activityDays;
         const chart = $(chartId);
         const hadFocus = chart.contains?.(document.activeElement);
         const fragment = document.createDocumentFragment();
@@ -153,19 +159,19 @@ function renderActivity(model) {
             fragment.appendChild(button);
         }
         chart.replaceChildren(fragment);
-        if (renderedRange !== days.length && chart.parentElement) {
+        if (renderedRanges[chartId] !== days.length && chart.parentElement) {
             chart.parentElement.scrollLeft = chart.parentElement.scrollWidth;
         }
+        renderedRanges[chartId] = days.length;
         const focusIndex = hadFocus ? days.findIndex(day => day.key === focusedDay) : -1;
         if (focusIndex >= 0) chart.children[focusIndex].focus();
     }
-    renderedRange = days.length;
     $('activityScale').textContent = runtime
         ? `Total running time per day · Scale 0–${compactDuration(maxActivity)} (m:ss or h m)`
         : `Completed cycles per day · Scale 0–${maxActivity}`;
-    $('averageScale').textContent = `Daily mean duration · Scale 0–${compactDuration(maxAverage)} (m:ss or h m)`;
-    $('swipeHint').hidden = days.length !== 30;
-    const selected = days.find(day => day.key === selectedDay);
+    $('averageScale').textContent = `${averageDays[0].key} – ${averageDays.at(-1).key} · Daily mean · Scale 0–${compactDuration(maxAverage)} (m:ss or h m)`;
+    $('swipeHint').hidden = activityDays.length <= 7 && averageDays.length <= 7;
+    const selected = [...activityDays, ...averageDays].find(day => day.key === selectedDay);
     $('dayDetail').textContent = selected ? dayLabel(selected) : '';
     $('activityPanel').hidden = false;
 }
@@ -228,6 +234,11 @@ $('chartRange').addEventListener('change', () => {
     renderTable(snapshot);
 });
 $('activityMetric').addEventListener('change', () => { if (snapshot) renderActivity(snapshot); });
+$('averageRange').addEventListener('change', () => {
+    if (!snapshot) return;
+    renderActivity(snapshot);
+    renderTable(snapshot);
+});
 $('clearDay').addEventListener('click', () => {
     selectedDay = null;
     if (!snapshot) return;
