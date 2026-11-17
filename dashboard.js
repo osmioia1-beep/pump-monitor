@@ -11,6 +11,7 @@ const formatDate = ms => Number.isFinite(ms) ? dateFormatter.format(ms) : 'Inval
 let snapshot = null;
 let selectedDay = null;
 let refreshing = false;
+let renderedRange = null;
 const REFRESH_INTERVAL = 60_000;
 function tableLimit() {
     const n = Number($('limitInput').value);
@@ -96,52 +97,76 @@ function renderTable(model) {
     $('emptyMsg').hidden = !!rows.length;
 }
 function renderActivity(model) {
-    const chart = $('activityChart');
-    const focusedDay = document.activeElement?.dataset?.day;
     const days = M.dailyActivity(model, $('chartRange').value === '30' ? 30 : 7);
-    const maxCycles = Math.max(1, ...days.map(day => day.cycles));
-    const maxRuntime = Math.max(1, ...days.map(day => day.runningMs));
-    const fragment = document.createDocumentFragment();
-    let detail = '';
+    const runtime = $('activityMetric').value === 'runtime';
+    const compactDuration = ms => {
+        if (!Number.isFinite(ms)) return '—';
+        const seconds = Math.floor(ms / 1000);
+        if (seconds >= 3600) return `${Math.floor(seconds / 3600)}h ${Math.floor(seconds % 3600 / 60)}m`;
+        return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+    };
+    const maxActivity = Math.max(1, ...days.map(day => runtime ? day.runningMs : day.cycles));
+    const maxAverage = Math.max(1, ...days.map(day => day.avgMs ?? 0));
+    const focusedDay = document.activeElement?.dataset?.day;
     if (!days.some(day => day.key === selectedDay)) selectedDay = null;
-    for (const [index, day] of days.entries()) {
-        const label = day.available
-            ? `${day.key} · ${day.cycles} completed cycles · ${M.formatDuration(day.runningMs)} running${day.partial ? ' · Partial history' : ''}`
-            : `${day.key} · No observation coverage`;
-        const button = document.createElement('button');
-        button.className = 'chart-day';
-        button.type = 'button';
-        button.setAttribute('data-day', day.key);
-        button.disabled = !day.available;
-        button.title = label;
-        button.setAttribute('aria-label', label);
-        button.setAttribute('aria-pressed', String(day.key === selectedDay));
-        if (day.key === selectedDay) detail = label;
-        button.addEventListener('click', () => {
-            selectedDay = selectedDay === day.key ? null : day.key;
-            renderActivity(model);
-            renderTable(model);
-            chart.children[index].focus();
-        });
-        const bars = document.createElement('span');
-        bars.className = 'chart-bars';
-        for (const [className, proportion] of [['cycles-bar', day.cycles / maxCycles], ['runtime-bar', day.runningMs / maxRuntime]]) {
+    const dayLabel = day => day.available
+        ? `${day.key} · ${day.cycles} completed cycles · ${M.formatDuration(day.runningMs)} running · Average ${M.formatDuration(day.avgMs)}${day.partial ? ' · Partial history' : ''}`
+        : `${day.key} · No observation coverage`;
+    for (const [chartId, average] of [['activityChart', false], ['averageChart', true]]) {
+        const chart = $(chartId);
+        const hadFocus = chart.contains?.(document.activeElement);
+        const fragment = document.createDocumentFragment();
+        chart.style.gridTemplateColumns = `repeat(${days.length}, minmax(36px, 1fr))`;
+        for (const [index, day] of days.entries()) {
+            const value = average ? day.avgMs : runtime ? day.runningMs : day.cycles;
+            const maximum = average ? maxAverage : maxActivity;
+            const button = document.createElement('button');
+            button.className = 'chart-day';
+            button.type = 'button';
+            button.setAttribute('data-day', day.key);
+            button.disabled = !day.available;
+            const label = dayLabel(day);
+            button.title = label;
+            button.setAttribute('aria-label', label);
+            button.setAttribute('aria-pressed', String(day.key === selectedDay));
+            button.addEventListener('click', () => {
+                selectedDay = selectedDay === day.key ? null : day.key;
+                renderActivity(model);
+                renderTable(model);
+                chart.children[index].focus();
+            });
+            const amount = document.createElement('span');
+            amount.className = 'chart-value';
+            amount.textContent = !day.available ? '—' : average || runtime ? compactDuration(value) : String(value);
+            const bars = document.createElement('span');
+            bars.className = 'chart-bars';
             const bar = document.createElement('span');
-            bar.className = 'chart-bar ' + className;
-            bar.style.height = `${proportion * 100}%`;
+            bar.className = 'chart-bar ' + (average ? 'average-bar' : runtime ? 'runtime-bar' : 'cycles-bar');
+            bar.style.height = `${day.available && value !== null ? value / maximum * 100 : 0}%`;
             bars.appendChild(bar);
+            const date = document.createElement('span');
+            date.className = 'chart-date';
+            date.textContent = day.key.slice(8) + '/' + day.key.slice(5, 7);
+            button.appendChild(amount);
+            button.appendChild(bars);
+            button.appendChild(date);
+            fragment.appendChild(button);
         }
-        const date = document.createElement('span');
-        date.className = 'chart-date';
-        date.textContent = day.available ? day.key.slice(5) : '— ' + day.key.slice(5);
-        button.appendChild(bars);
-        button.appendChild(date);
-        fragment.appendChild(button);
+        chart.replaceChildren(fragment);
+        if (renderedRange !== days.length && chart.parentElement) {
+            chart.parentElement.scrollLeft = chart.parentElement.scrollWidth;
+        }
+        const focusIndex = hadFocus ? days.findIndex(day => day.key === focusedDay) : -1;
+        if (focusIndex >= 0) chart.children[focusIndex].focus();
     }
-    chart.replaceChildren(fragment);
-    const focusIndex = focusedDay ? days.findIndex(day => day.key === focusedDay) : -1;
-    if (focusIndex >= 0) chart.children[focusIndex].focus();
-    $('dayDetail').textContent = detail;
+    renderedRange = days.length;
+    $('activityScale').textContent = runtime
+        ? `Total running time per day · Scale 0–${compactDuration(maxActivity)} (m:ss or h m)`
+        : `Completed cycles per day · Scale 0–${maxActivity}`;
+    $('averageScale').textContent = `Daily mean duration · Scale 0–${compactDuration(maxAverage)} (m:ss or h m)`;
+    $('swipeHint').hidden = days.length !== 30;
+    const selected = days.find(day => day.key === selectedDay);
+    $('dayDetail').textContent = selected ? dayLabel(selected) : '';
     $('activityPanel').hidden = false;
 }
 function renderSnapshot() {
@@ -202,6 +227,7 @@ $('chartRange').addEventListener('change', () => {
     renderActivity(snapshot);
     renderTable(snapshot);
 });
+$('activityMetric').addEventListener('change', () => { if (snapshot) renderActivity(snapshot); });
 $('clearDay').addEventListener('click', () => {
     selectedDay = null;
     if (!snapshot) return;

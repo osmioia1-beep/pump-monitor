@@ -49,20 +49,54 @@
         .panel label { font-size: .85rem; }
         .status-line { color: #2c3e50; font-weight: 650; }
         .chart-scroll { overflow-x: auto; margin-top: 12px; }
-        .chart { display: flex; gap: 4px; padding: 4px; }
-        .chart-day { flex: 1 0 68px; min-width: 0; border: 1px solid #dbe3e8; border-radius: 5px; background: white; color: #2c3e50; cursor: pointer; }
+        .chart { display: grid; gap: 4px; padding: 6px 2px; }
+        .chart-day { min-width: 0; border: 1px solid transparent; border-radius: 6px; background: white; color: #2c3e50; cursor: pointer; padding: 4px 0 !important; }
         .chart-day:hover, .chart-day[aria-pressed="true"] { background: #edf6ff; border-color: #2668a3; }
         .chart-day:disabled { cursor: default; color: #52616d; }
-        .chart-bars { display: flex; height: 90px; align-items: flex-end; justify-content: center; gap: 4px; border-bottom: 1px solid #dbe3e8; margin-bottom: 6px; }
-        .chart-bar { width: 30%; border-radius: 2px 2px 0 0; }
+        .chart-bars { display: flex; height: 124px; align-items: flex-end; justify-content: center; border-bottom: 1px solid #dbe3e8; margin-bottom: 8px; }
+        .chart-bar { width: 65%; max-width: 38px; border-radius: 4px 4px 0 0; }
         .cycles-bar { background: #2668a3; }
         .runtime-bar { background: #087d67; }
-        .chart-date { display: block; font-size: .73rem; white-space: nowrap; }
+        .average-bar { background: #7956ad; }
+        .chart-date { display: block; font-size: .7rem; white-space: nowrap; }
+        .chart-value { display: block; font-size: .7rem; font-weight: 650; min-height: 32px; overflow-wrap: anywhere; }
+        .chart-scale { font-size: .8rem; color: #52616d; margin-top: 12px; }
+        .chart-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .average-heading { margin-top: 26px; }
+        .swipe-hint { display: none; }
+        button, select, input { touch-action: manipulation; }
+        button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid #2668a3; outline-offset: 2px; }
         .chart-legend, .history-filter { color: #52616d; font-size: .85rem; margin-top: 8px; }
         .chart-legend span { margin-right: 12px; }
         .chart-legend span::before { content: ''; display: inline-block; width: .7rem; height: .7rem; margin-right: 5px; background: #2668a3; }
         .chart-legend span + span::before { background: #087d67; }
         .history-filter button { margin-left: 8px; }
+        @media (max-width: 600px) {
+            body { padding: 0; background: white; }
+            .container { border-radius: 0; box-shadow: none; }
+            header { padding: 16px; gap: 12px; }
+            h1 { font-size: 1.3rem; }
+            .controls { width: 100%; }
+            .controls input { width: 66px; font-size: 16px; min-height: 44px; }
+            .controls button { min-height: 44px; margin-left: auto; }
+            .context, .panel, .last-event-row { padding: 16px; }
+            .context { font-size: .8rem; }
+            .panel-header { align-items: flex-start; }
+            .chart-tools { width: 100%; justify-content: space-between; }
+            .panel select, .panel button { min-height: 44px; }
+            .panel select { font-size: 16px; max-width: 100%; }
+            .chart-scroll { -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+            .swipe-hint { display: block; font-size: .8rem; color: #52616d; margin-top: 8px; }
+            .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 16px; gap: 8px; }
+            .stat-card { padding: 12px; }
+            .stat-value { font-size: 1.1rem; }
+            .stat-section h3 { padding: 0 0 8px; }
+            .horizon-coverage { font-size: .73rem; }
+            th, td { padding: 12px 10px; font-size: .8rem; }
+            .table-scroll { margin: 0 16px; }
+            table { min-width: 520px; }
+            .error { margin: 16px; }
+        }
     </style>
 </head>
 <body>
@@ -80,16 +114,24 @@
             <p id="pumpState" class="status-line" role="status"></p>
             <p id="coverage"></p>
             <p id="quality" role="status"></p>
-            <p>Completed cycles are assigned to the day they end. Running time is split across days and includes the open cycle up to the snapshot. Average, maximum and minimum durations use completed cycles only. Daily rates use the full calendar window; incomplete days show N/A. Global cycles/day includes every observed calendar date, including idle and partial dates.</p>
+            <details><summary>How metrics are calculated</summary><p>Completed cycles are assigned to the day they end. Running time is split across days and includes the open cycle up to the snapshot. Average, maximum and minimum durations use completed cycles only. Daily rates use the full calendar window; incomplete days show N/A. Global cycles/day includes every observed calendar date, including idle and partial dates.</p></details>
         </div>
 
         <section class="panel" id="activityPanel" hidden>
             <div class="panel-header">
                 <h2>Daily activity</h2>
-                <label>Show <select id="chartRange"><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></label>
+                <div class="chart-tools">
+                    <label>Period <select id="chartRange"><option value="7">7 days</option><option value="30">30 days</option></select></label>
+                    <label>Activity <select id="activityMetric"><option value="cycles">Cycles</option><option value="runtime">Running time</option></select></label>
+                </div>
             </div>
-            <p class="chart-legend"><span>Completed cycles</span><span>Running time</span> Each series uses its own scale. Select a day to see its totals and history.</p>
+            <p class="chart-scale" id="activityScale"></p>
             <div class="chart-scroll"><div class="chart" id="activityChart"></div></div>
+            <h2 class="average-heading">Average time per cycle</h2>
+            <p class="chart-scale" id="averageScale"></p>
+            <div class="chart-scroll"><div class="chart" id="averageChart"></div></div>
+            <p class="chart-scale">Completed cycles by their stop date, in Lisbon time. Tap a day for details and history. A dash means no completed cycles or no observation coverage.</p>
+            <p class="swipe-hint" id="swipeHint" hidden>Swipe either graph to see earlier dates.</p>
             <p class="chart-legend" id="dayDetail" aria-live="polite"></p>
         </section>
 
@@ -226,8 +268,8 @@
         <div id="emptyMsg" class="empty" hidden>No events found</div>
     </div>
 
-    <script src="metrics.js?v=20261117-activity-1" defer></script>
-    <script src="data.js?v=20261117-activity-1" defer></script>
-    <script src="app.js?v=20261117-activity-1" defer></script>
+    <script src="metrics.js?v=20261117-mobile-2" defer></script>
+    <script src="data.js?v=20261117-mobile-2" defer></script>
+    <script src="dashboard.js?v=20261117-mobile-2" defer></script>
 </body>
 </html>

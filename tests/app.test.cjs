@@ -41,7 +41,7 @@ async function setup(){
         const page=state.rows.slice(offset,offset+2);
         return {ok:true,headers:{get:()=>page.length?`${offset}-${offset+page.length-1}/${state.rows.length}`:'*/0'},json:async()=>page};
     }});
-    for(const script of ['metrics.js','data.js','app.js'])vm.runInContext(fs.readFileSync(path.join(root,script),'utf8'),context,{filename:script});
+    for(const script of ['metrics.js','data.js','dashboard.js'])vm.runInContext(fs.readFileSync(path.join(root,script),'utf8'),context,{filename:script});
     // Drain asynchronous initial refresh, without external services or a browser dependency.
     for(let i=0;i<20;i++)await new Promise(resolve=>setImmediate(resolve));
     return {elements,state,context};
@@ -51,6 +51,8 @@ test('actual page scripts render shared metrics and safe event text across all l
     assert.equal(state.calls,3);assert.equal(e.cyclesGlobal.textContent,'2');
     assert.equal(e.runningTimeToday.textContent,'10m 0s');assert.equal(e.runningTimeYesterday.textContent,'10m 0s');
     assert.equal(e.avgRunningToday.textContent,'20m 0s');
+    assert.equal(e.averageChart.children.length,7);
+    assert.equal(e.averageChart.children.at(-1).children[0].textContent,'20:00');
     assert.equal(e.eventsBody.children.length,5);
     const latest=e.eventsBody.children[0];
     assert.equal(latest.children[2].textContent,'Stop without a start');
@@ -77,6 +79,7 @@ test('empty history presents unknown coverage instead of zero activity',async()=
     const {elements:e,state,context}=await setup();state.rows=[];await vm.runInContext('refresh()',context);
     assert.equal(e.cyclesGlobal.textContent,'N/A');assert.equal(e.cyclesYesterday.textContent,'N/A');
     assert.equal(e.eventsTable.hidden,true);assert.equal(e.emptyMsg.hidden,false);
+    assert.equal(e.averageChart.children.at(-1).children[0].textContent,'—');
 });
 test('selecting a chart day filters the cycle view using the Lisbon stop date',async()=>{
     const {elements:e,state}=await setup();
