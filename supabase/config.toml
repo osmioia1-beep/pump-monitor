@@ -1,0 +1,4 @@
+project_id = "pump-monitor"
+
+[functions.pump-watch]
+verify_jwt = false

@@ -42,6 +42,27 @@
         .horizon-coverage { color: #52616d; font-size: .8rem; }
         .table-scroll { overflow-x: auto; }
         .stat-value { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+        .panel { padding: 20px; border-top: 1px solid #e1e7eb; }
+        .panel-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+        .panel h2 { font-size: 1.1rem; color: #2c3e50; }
+        .panel select, .panel button { font: inherit; padding: 6px; }
+        .panel label { font-size: .85rem; }
+        .status-line { color: #2c3e50; font-weight: 650; }
+        .chart-scroll { overflow-x: auto; margin-top: 12px; }
+        .chart { display: flex; gap: 4px; padding: 4px; }
+        .chart-day { flex: 1 0 68px; min-width: 0; border: 1px solid #dbe3e8; border-radius: 5px; background: white; color: #2c3e50; cursor: pointer; }
+        .chart-day:hover, .chart-day[aria-pressed="true"] { background: #edf6ff; border-color: #2668a3; }
+        .chart-day:disabled { cursor: default; color: #52616d; }
+        .chart-bars { display: flex; height: 90px; align-items: flex-end; justify-content: center; gap: 4px; border-bottom: 1px solid #dbe3e8; margin-bottom: 6px; }
+        .chart-bar { width: 30%; border-radius: 2px 2px 0 0; }
+        .cycles-bar { background: #2668a3; }
+        .runtime-bar { background: #087d67; }
+        .chart-date { display: block; font-size: .73rem; white-space: nowrap; }
+        .chart-legend, .history-filter { color: #52616d; font-size: .85rem; margin-top: 8px; }
+        .chart-legend span { margin-right: 12px; }
+        .chart-legend span::before { content: ''; display: inline-block; width: .7rem; height: .7rem; margin-right: 5px; background: #2668a3; }
+        .chart-legend span + span::before { background: #087d67; }
+        .history-filter button { margin-left: 8px; }
     </style>
 </head>
 <body>
@@ -56,11 +77,21 @@
         </header>
 
         <div class="context">
-            <p id="coverage" role="status" aria-live="polite"></p>
-            <p id="pumpState"></p>
+            <p id="pumpState" class="status-line" role="status"></p>
+            <p id="coverage"></p>
             <p id="quality" role="status"></p>
             <p>Completed cycles are assigned to the day they end. Running time is split across days and includes the open cycle up to the snapshot. Average, maximum and minimum durations use completed cycles only. Daily rates use the full calendar window; incomplete days show N/A. Global cycles/day includes every observed calendar date, including idle and partial dates.</p>
         </div>
+
+        <section class="panel" id="activityPanel" hidden>
+            <div class="panel-header">
+                <h2>Daily activity</h2>
+                <label>Show <select id="chartRange"><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></label>
+            </div>
+            <p class="chart-legend"><span>Completed cycles</span><span>Running time</span> Each series uses its own scale. Select a day to see its totals and history.</p>
+            <div class="chart-scroll"><div class="chart" id="activityChart"></div></div>
+            <p class="chart-legend" id="dayDetail" aria-live="polite"></p>
+        </section>
 
         <!-- GLOBAL SECTION -->
         <div class="stats stat-section" id="statsGlobal">
@@ -165,6 +196,15 @@
         <div id="error" class="error" role="alert" hidden></div>
         <div id="loading" class="loading" role="status" hidden>Loading history…</div>
 
+        <section class="panel">
+            <div class="panel-header">
+                <h2>History</h2>
+                <label>View <select id="historyView"><option value="events">Raw events</option><option value="cycles">Completed cycles</option></select></label>
+            </div>
+            <div class="history-filter" id="historyFilter" hidden>
+                <span id="historyDay"></span><button type="button" id="clearDay">Show all dates</button>
+            </div>
+        </section>
         <div class="table-scroll">
         <table id="eventsTable" hidden>
             <thead>
@@ -176,6 +216,10 @@
                 </tr>
             </thead>
             <tbody id="eventsBody"></tbody>
+        </table>
+        <table id="cyclesTable" hidden>
+            <thead><tr><th>Start (Lisbon)</th><th>Stop (Lisbon)</th><th>Duration</th><th>Time since previous stop</th></tr></thead>
+            <tbody id="cyclesBody"></tbody>
         </table>
         </div>
 

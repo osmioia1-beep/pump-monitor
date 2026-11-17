@@ -14,13 +14,15 @@ const rows=[
     {event:'stop',ts:'2026-10-23T23:20:00Z',source_ip:'<img src=x onerror="window.injected=true">'}
 ];
 class Element {
-    constructor(tag='div'){this.tag=tag;this.children=[];this.handlers={};this.hidden=false;this.value='';this.text='';}
+    constructor(tag='div'){this.tag=tag;this.children=[];this.handlers={};this.hidden=false;this.value='';this.text='';this.style={};}
     set textContent(value){this.text=String(value);this.children=[];}
     get textContent(){return this.text+this.children.map(c=>c.textContent).join('');}
     set innerHTML(value){throw new Error('Event data must not be inserted as HTML');}
     appendChild(child){if(child.tag==='fragment')this.children.push(...child.children);else this.children.push(child);return child;}
     replaceChildren(...children){this.children=[];this.text='';children.forEach(c=>this.appendChild(c));}
     addEventListener(event,handler){this.handlers[event]=handler;}
+    setAttribute(name,value){this[name]=value;}
+    focus(){}
 }
 async function setup(){
     const elements={};
@@ -75,4 +77,21 @@ test('empty history presents unknown coverage instead of zero activity',async()=
     const {elements:e,state,context}=await setup();state.rows=[];await vm.runInContext('refresh()',context);
     assert.equal(e.cyclesGlobal.textContent,'N/A');assert.equal(e.cyclesYesterday.textContent,'N/A');
     assert.equal(e.eventsTable.hidden,true);assert.equal(e.emptyMsg.hidden,false);
+});
+test('selecting a chart day filters the cycle view using the Lisbon stop date',async()=>{
+    const {elements:e,state}=await setup();
+    const calls=state.calls;
+    assert.equal(e.activityChart.children.length,7);
+    e.activityChart.children.at(-1).handlers.click();
+    e.historyView.value='cycles';
+    e.historyView.handlers.change();
+    assert.equal(e.eventsTable.hidden,true);
+    assert.equal(e.cyclesTable.hidden,false);
+    assert.equal(e.cyclesBody.children.length,1);
+    assert.equal(e.cyclesBody.children[0].children[2].textContent,'20m 0s');
+    e.clearDay.handlers.click();
+    assert.equal(e.cyclesBody.children.length,2);
+    e.chartRange.value='30';e.chartRange.handlers.change();
+    assert.equal(e.activityChart.children.length,30);
+    assert.equal(state.calls,calls);
 });

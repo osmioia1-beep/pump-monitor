@@ -121,5 +121,15 @@
             today: summarize(data, todayStart, now, now, true),
             yesterday: summarize(data, yesterdayStart, todayStart, now) };
     }
-    return { TIME_ZONE, dayKey, shiftDay, midnight, formatDuration, analyze };
+    function dailyActivity(model, days) {
+        const today = dayKey(model.now);
+        return Array.from({ length: days }, (_, index) => {
+            const key = shiftDay(today, index + 1 - days);
+            const current = key === today;
+            const from = midnight(key);
+            const to = current ? model.now : midnight(shiftDay(key, 1));
+            return { key, ...summarize(model, from, to, model.now, current) };
+        });
+    }
+    return { TIME_ZONE, dayKey, shiftDay, midnight, formatDuration, analyze, dailyActivity };
 });
