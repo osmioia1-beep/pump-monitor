@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const root = path.join(__dirname, '..');
 
 test('manifest icons have the declared PNG sizes and a standalone launch URL', () => {
-    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.webmanifest')));
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json')));
     assert.equal(manifest.display, 'standalone');
     assert.equal(manifest.start_url, '/');
     for (const icon of manifest.icons) {
