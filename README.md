@@ -2,6 +2,12 @@
 
 Static, read-only dashboard for `pump_events`. Serve this directory with any static HTTP server; no build or npm dependencies are required.
 
+## Install on a phone
+
+Open the HTTPS dashboard and tap **Install app**. Supported browsers show their installation prompt. On iPhone, use Safari's Share menu, choose **Add to Home Screen**, enable **Open as Web App** if shown, and tap **Add**. The installed app opens in its own window.
+
+Live data requires an internet connection. After an initial online visit, an offline launch shows a connection page with a retry action. The service worker caches that page and the app icons. Dashboard scripts and pump API responses continue to load over the network.
+
 ## Metric definitions
 
 - The installation time zone is **Europe/Lisbon**, independent of the viewer's device. Calendar boundaries account for 23-hour and 25-hour daylight-saving days.

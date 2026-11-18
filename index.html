@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pump Monitor</title>
+    <meta name="theme-color" content="#2c3e50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Pump Monitor">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" type="image/png" href="/icon-192.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
@@ -71,6 +77,11 @@
         .chart-legend span::before { content: ''; display: inline-block; width: .7rem; height: .7rem; margin-right: 5px; background: #2668a3; }
         .chart-legend span + span::before { background: #087d67; }
         .history-filter button { margin-left: 8px; }
+        dialog { margin: auto; width: min(90vw, 420px); padding: 24px; border: 0; border-radius: 12px; color: #2c3e50; box-shadow: 0 12px 40px #0003; }
+        dialog::backdrop { background: #0007; }
+        dialog h2 { font-size: 1.2rem; }
+        dialog p { margin-top: 16px; line-height: 1.5; }
+        dialog button { margin-top: 20px; min-height: 44px; padding: 10px 20px; font: inherit; border: 0; border-radius: 5px; background: #2668a3; color: white; cursor: pointer; }
         @media (max-width: 600px) {
             body { padding: 0; background: white; }
             .container { border-radius: 0; box-shadow: none; }
@@ -110,6 +121,7 @@
                 <label for="limitInput">Table rows</label>
                 <input type="number" id="limitInput" value="50" min="1" max="500" step="1">
                 <button id="refreshBtn">Refresh</button>
+                <button id="installBtn" type="button" hidden>Install app</button>
             </div>
         </header>
 
@@ -277,6 +289,13 @@
         <div id="emptyMsg" class="empty" hidden>No events found</div>
     </div>
 
+    <dialog id="installDialog" aria-labelledby="installTitle">
+        <h2 id="installTitle">Install Pump Monitor</h2>
+        <p id="installInstructions"></p>
+        <p>Open Pump Monitor from your home screen in its own app window. Live readings and charts require an internet connection.</p>
+        <form method="dialog"><button>Got it</button></form>
+    </dialog>
+    <script src="/install.js" defer></script>
     <script src="metrics.js?v=20261117-mobile-2" defer></script>
     <script src="data.js?v=20261117-mobile-2" defer></script>
     <script src="dashboard.js?v=20261117-history-3" defer></script>
